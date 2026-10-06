@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Левада — clickable mockup</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js" crossorigin></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useMemo } = React;
+
+/* -------------------------------------------------------------------------
+ * Illustrative pricing engine.
+ * NOT the real Levada price list — only the two flagship packages below are
+ * confirmed (see docs/PRD.md §7). Everything else here is a placeholder
+ * formula so the calculator screen is genuinely interactive to click
+ * through. Replace with the real pricing logic/API before shipping.
+ * ---------------------------------------------------------------------- */
+function computePrice(cfg) {
+  const isHard = cfg.cover === "Тверда";
+  const base = isHard
+    ? (cfg.qty > 100 ? 200 : 220) // hard cover: 100+ price unconfirmed, see PRD open question
+    : (cfg.qty > 100 ? 160 : 180); // soft cover: confirmed anchor prices
+
+  let unit = base;
+  if (cfg.edition === "Журнал") unit += 10;
+  if (cfg.paper === "Офсет 100") unit += 5;
+  if (cfg.paper === "Крейда 130") unit += 15;
+  if (cfg.color === "Колір") unit += 40;
+  if (cfg.binding === "Шиття") unit += 10;
+  if (cfg.binding === "Пружина") unit += 6;
+  if (cfg.finish === "Матова") unit += 8;
+  if (cfg.finish === "Глянець") unit += 8;
+  if (cfg.finish === "Фольга") unit += 25;
+  const extraPages = Math.max(0, cfg.pages - 100);
+  unit += extraPages * 0.5;
+
+  unit = Math.round(unit);
+  return { unit, total: unit * cfg.qty };
+}
+
+function fmt(n) {
+  return n.toLocaleString("uk-UA");
+}
+
+/* ---------------------------- shared bits ------------------------------ */
+
+function StatusBar({ dark }) {
+  return (
+    <div className={"statusbar" + (dark ? " on-dark" : "")}>
+      <span>9:41</span>
+      <span className="dots"><span></span><span></span><span></span></span>
+    </div>
+  );
+}
+
+function TopBar({ dark, menuLabel }) {
+  return (
+    <div className={"topbar" + (dark ? " on-dark" : "")}>
+      <div className="logo">ЛЕВАДА</div>
+      {menuLabel ? (
+        <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.05em" }}>{menuLabel}</span>
+      ) : (
+        <div className="burger"><span></span><span></span><span></span></div>
+      )}
+    </div>
+  );
+}
+
+function ServiceCard({ title, desc, from }) {
+  return (
+    <div className="card">
+      <h4>{title}</h4>
+      <p>{desc}</p>
+      <div className="from">{from}</div>
+    </div>
+  );
+}
+
+/* ------------------------------- Home ----------------------------------- */
+
+const WHAT_WE_PRINT = [
+  { title: "Книги", desc: "Тверда й м'яка обкладинка. Біндер, шиття, пружина. Будь-який формат.", from: "від 160 грн / прим." },
+  { title: "Журнали", desc: "A4, м'яка або тверда обкладинка, 100 сторінок і більше.", from: "від 180 грн / прим." },
+  { title: "ISBN і розповсюдження", desc: "Оформлення ISBN, підготовка до продажу.", from: "за запитом" },
+  { title: "Малий наклад і друк на вимогу", desc: "Від одного примірника — для авторів і навчальних матеріалів.", from: "мін. наклад 1" },
+];
+
+function Home({ onOrderCall, onOpenCalculator }) {
+  const [variant, setVariant] = useState("A");
+  const dark = variant === "B";
+
+  return (
+    <div className="screen">
+      <StatusBar dark={dark} />
+      <TopBar dark={dark} menuLabel={dark ? "МЕНЮ" : null} />
+
+      <div className={"section" + (dark ? " on-dark" : "")}>
+        <div className="variant-switch">
+          <button className={variant === "A" ? "active" : ""} onClick={() => setVariant("A")}>Варіант А</button>
+          <button className={variant === "B" ? "active" : ""} onClick={() => setVariant("B")}>Варіант Б</button>
+        </div>
+
+        {variant === "A" ? (
+          <div className="eyebrow">ДРУКАРНЯ · ВІД 1 ПРИМІРНИКА</div>
+        ) : null}
+
+        <h1 className="hero-title">Друкуємо книги та журнали</h1>
+        <p className="hero-sub">Тверді й м'які обкладинки, біндер, шиття, пружина. Будь-який формат.</p>
+
+        {dark && <div className="hero-image-block" />}
+
+        <button className="btn btn-primary" onClick={() => onOrderCall()}>Замовити дзвінок</button>
+        <button className="btn btn-secondary" onClick={onOpenCalculator}>Розрахувати вартість</button>
+      </div>
+
+      {variant === "A" && (
+        <>
+          <div className="stat-row">
+            <div className="stat"><div className="num">18</div><div className="label">років досвіду</div></div>
+            <div className="stat"><div className="num">1</div><div className="label">мін. наклад</div></div>
+            <div className="stat"><div className="num">5</div><div className="label">днів на тираж</div></div>
+          </div>
+
+          <div className="price-table">
+            <div className="price-table-head">
+              <h3>Ціни</h3>
+              <span className="eyebrow">за примірник</span>
+            </div>
+            <div className="price-row">
+              <div className="name">М'яка обкладинка, а4, біндер, 100 сторінок</div>
+              <div className="prices"><div className="old">180 грн</div><div className="new">160 грн</div></div>
+            </div>
+            <div className="price-row">
+              <div className="name">Тверда обкладинка, а4, шиття, 100 сторінок</div>
+              <div className="prices"><div className="old">220 грн</div><div className="new">200 грн</div></div>
+            </div>
+            <div className="price-row">
+              <div className="name">Індивідуальні навчальні матеріали</div>
+              <div className="single">за запитом</div>
+            </div>
+          </div>
+        </>
+      )}
+
+      <div className="section" style={{ borderTop: variant === "A" ? "1px solid var(--line)" : "none" }}>
+        <h3 style={{ marginTop: 0 }}>Що друкуємо</h3>
+        <div className="card-grid">
+          {WHAT_WE_PRINT.map((item) => (
+            <ServiceCard key={item.title} {...item} />
+          ))}
+        </div>
+      </div>
+
+      <div className="testimonial">
+        <div className="eyebrow">Відгук</div>
+        <p className="quote">«Наклад 120 книг у твердій — зробили за тиждень, шиття рівне, колір на обкладинці саме той.»</p>
+        <div className="who">— ім'я клієнта, видавництво (заглушка)</div>
+      </div>
+
+      <div className="cta-band">
+        <span>Надішліть макет — порахуємо сьогодні</span>
+        <button className="btn btn-primary" onClick={() => onOrderCall()}>Дзвінок</button>
+      </div>
+    </div>
+  );
+}
+
+/* ----------------------------- Calculator -------------------------------- */
+
+function Calculator({ onOrderCall }) {
+  const [cfg, setCfg] = useState({
+    edition: "Книга",
+    qty: 150,
+    format: "a4",
+    pages: 100,
+    cover: "Тверда",
+    binding: "Шиття",
+    paper: "Офсет 80",
+    color: "Ч/б",
+    finish: "Без",
+  });
+
+  const price = useMemo(() => computePrice(cfg), [cfg]);
+  const set = (key) => (val) => setCfg((c) => ({ ...c, [key]: val }));
+
+  return (
+    <div className="screen" style={{ display: "flex", flexDirection: "column" }}>
+      <StatusBar />
+      <div className="topbar">
+        <div className="logo">Розрахувати вартість</div>
+      </div>
+
+      <div className="section" style={{ flex: 1 }}>
+        <div className="field">
+          <span className="field-label">Тип видання</span>
+          <div className="toggle-row">
+            {["Книга", "Журнал"].map((v) => (
+              <button key={v} className={"toggle" + (cfg.edition === v ? " active" : "")} onClick={() => set("edition")(v)}>{v}</button>
+            ))}
+          </div>
+        </div>
+
+        <div className="field">
+          <div className="qty-row">
+            <span className="field-label" style={{ margin: 0 }}>Наклад</span>
+            <span className="value">{cfg.qty >= 500 ? "500+" : cfg.qty} прим.</span>
+          </div>
+          <input
+            type="range" min="1" max="500" value={Math.min(cfg.qty, 500)}
+            onChange={(e) => set("qty")(Number(e.target.value))}
+          />
+          <div className="range-scale"><span>1</span><span>500+</span></div>
+        </div>
+
+        <div className="field field-pair">
+          <div className="field">
+            <span className="field-label">Формат</span>
+            <select value={cfg.format} onChange={(e) => set("format")(e.target.value)}>
+              <option value="a4">A4</option>
+              <option value="a5">A5</option>
+              <option value="a6">A6</option>
+            </select>
+          </div>
+          <div className="field">
+            <span className="field-label">Сторінок</span>
+            <input type="number" min="1" value={cfg.pages} onChange={(e) => set("pages")(Number(e.target.value) || 0)} />
+          </div>
+        </div>
+
+        <div className="field">
+          <span className="field-label">Обкладинка</span>
+          <div className="toggle-row">
+            {["М'яка", "Тверда"].map((v) => (
+              <button key={v} className={"toggle" + (cfg.cover === v ? " active" : "")} onClick={() => set("cover")(v)}>{v}</button>
+            ))}
+          </div>
+        </div>
+
+        <div className="field">
+          <span className="field-label">Кріплення</span>
+          <div className="toggle-row">
+            {["Біндер", "Шиття", "Пружина"].map((v) => (
+              <button key={v} className={"toggle" + (cfg.binding === v ? " active" : "")} onClick={() => set("binding")(v)}>{v}</button>
+            ))}
+          </div>
+        </div>
+
+        <div className="field">
+          <span className="field-label">Папір</span>
+          <div className="toggle-row">
+            {["Офсет 80", "Офсет 100", "Крейда 130"].map((v) => (
+              <button key={v} className={"toggle" + (cfg.paper === v ? " active" : "")} onClick={() => set("paper")(v)}>{v}</button>
+            ))}
+          </div>
+        </div>
+
+        <div className="field">
+          <span className="field-label">Колірність</span>
+          <div className="toggle-row">
+            {["Ч/б", "Колір"].map((v) => (
+              <button key={v} className={"toggle" + (cfg.color === v ? " active" : "")} onClick={() => set("color")(v)}>{v}</button>
+            ))}
+          </div>
+        </div>
+
+        <div className="field">
+          <span className="field-label">Ламінація / оздоблення</span>
+          <div className="toggle-row">
+            {["Без", "Матова", "Глянець", "Фольга"].map((v) => (
+              <button key={v} className={"toggle" + (cfg.finish === v ? " active" : "")} onClick={() => set("finish")(v)}>{v}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="disclaimer">Ціна — орієнтовна ілюстрація для макета, не реальний прайс-лист Левади.</div>
+      <div className="sticky-price">
+        <div className="breakdown">{price.unit} грн × {cfg.qty >= 500 ? "500+" : cfg.qty} прим.</div>
+        <div className="total">{fmt(price.total)} грн</div>
+        <button className="btn btn-primary" onClick={() => onOrderCall(cfg, price)}>Замовити дзвінок</button>
+      </div>
+    </div>
+  );
+}
+
+/* ----------------------------- Portfolio --------------------------------- */
+
+const PORTFOLIO = [
+  { title: "Поетична збірка", spec: "м'яка · біндер · а5 · 120 с.", qty: "50 прим.", photoNote: "фото: розворот, офсетний папір" },
+  { title: "Науковий збірник", spec: "тверда · шиття · а4 · 220 с.", qty: "80 прим.", photoNote: "фото: корінець, шиття" },
+  { title: "Студентський журнал", spec: "м'яка · пружина · а4 · 60 с.", qty: "120 прим.", photoNote: "фото: обкладинка" },
+];
+
+function Portfolio() {
+  return (
+    <div className="screen">
+      <StatusBar />
+      <div className="topbar">
+        <div className="logo">← Наші роботи</div>
+      </div>
+      <div className="section">
+        {PORTFOLIO.map((item) => (
+          <div className="portfolio-item" key={item.title}>
+            <div className="placeholder-photo">[ {item.photoNote} ]</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 10 }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>{item.title}</div>
+                <div style={{ fontSize: 12.5, color: "var(--muted)" }}>{item.spec}</div>
+              </div>
+              <div style={{ fontWeight: 700, fontSize: 13 }}>{item.qty}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------- Callback modal ------------------------------ */
+
+function CallbackModal({ config, price, onClose }) {
+  const [sent, setSent] = useState(false);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+
+  const configLine = config
+    ? `${config.edition}, ${config.cover.toLowerCase()}, ${config.binding.toLowerCase()}, ${config.format}, ${config.pages} с., ${config.qty} прим. — ${fmt(price.total)} грн`
+    : null;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="close-row"><button onClick={onClose} aria-label="Закрити">×</button></div>
+        {sent ? (
+          <div className="success-box">
+            <div className="check">✓</div>
+            <h3>Дякуємо!</h3>
+            <p className="sub">Ми зателефонуємо найближчим часом, щоб підтвердити деталі й ціну.</p>
+            <button className="btn btn-secondary" onClick={onClose}>Закрити</button>
+          </div>
+        ) : (
+          <>
+            <h3>Замовити дзвінок</h3>
+            <p className="sub">Залиште контакт — передзвонимо і уточнимо всі деталі.</p>
+            <label>Ім'я</label>
+            <input type="text" placeholder="Ваше ім'я" value={name} onChange={(e) => setName(e.target.value)} />
+            <label>Телефон</label>
+            <input type="tel" placeholder="+380" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            {configLine && <div className="config-note">Конфігурація з калькулятора буде додана до заявки:<br />{configLine}</div>}
+            <div style={{ marginTop: 18 }}>
+              <button className="btn btn-primary" onClick={() => setSent(true)}>Надіслати заявку</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* --------------------------------- App ------------------------------------ */
+
+function App() {
+  const [screen, setScreen] = useState("home");
+  const [modal, setModal] = useState(null); // null | { config, price }
+
+  const openCallback = (config, price) => setModal({ config: config || null, price: price || null });
+
+  return (
+    <div className="viewport">
+      <div className="phone">
+        {screen === "home" && <Home onOrderCall={openCallback} onOpenCalculator={() => setScreen("calculator")} />}
+        {screen === "calculator" && <Calculator onOrderCall={openCallback} />}
+        {screen === "portfolio" && <Portfolio />}
+
+        <div className="tabbar">
+          <button className={screen === "home" ? "active" : ""} onClick={() => setScreen("home")}>Головна</button>
+          <button className={screen === "calculator" ? "active" : ""} onClick={() => setScreen("calculator")}>Калькулятор</button>
+          <button className={screen === "portfolio" ? "active" : ""} onClick={() => setScreen("portfolio")}>Портфоліо</button>
+        </div>
+
+        {modal && <CallbackModal config={modal.config} price={modal.price} onClose={() => setModal(null)} />}
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+</body>
+</html>
